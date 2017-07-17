@@ -1,10 +1,10 @@
-all: servidor cliente
+all: servidorT clienteT
 
-servidor: servidor.c 
+servidorT: servidor_taller.c 
 	gcc -Wall -g $^ -o $@
 
-cliente: cliente.c 
+clienteT: cliente_taller.c 
 	gcc -Wall $^ -o $@
 
 clean:
-	rm -rf cliente servidor
+	rm -rf clienteT servidorT
