@@ -16,8 +16,7 @@
 #include <arpa/inet.h>
 #include <sys/resource.h>
 
-
-#define BUFLEN 128 
+#define BUFLEN 1024
 #define MAXSLEEP 64
 
 int connect_retry( int domain, int type, int protocol, 	const struct sockaddr *addr, socklen_t alen){
@@ -28,52 +27,33 @@ int connect_retry( int domain, int type, int protocol, 	const struct sockaddr *a
 
 		if (( fd = socket( domain, type, protocol)) < 0) 
 			return(-1); 
-
 		if (connect( fd, addr, alen) == 0) { /* * Conexión aceptada. */ 
 			return(fd); 
 		} 
 		close(fd); 				//Si falla conexion cerramos y creamos nuevo socket
-
 		/* * Delay before trying again. */
 		if (numsec <= MAXSLEEP/2)
-
 			sleep( numsec); 
 	} 
 	return(-1); 
 }
 
-
-void print_uptime( int sockfd) { 
-	int n; 
-	char buf[ BUFLEN]; 
-
-	while (( n = recv( sockfd, buf, BUFLEN, 0)) > 0) 				
-		write( STDOUT_FILENO, buf, n); 			//Imprimimos lo que recibimos
-	if (n < 0) 	
-		printf(" recv error"); 
-}
-
-
-
 int main( int argc, char *argv[]) { 
 
 	int sockfd;
+	int filefd; 
 
 	if(argc == 1){
 		printf("Uso: ./cliente <ip> <puerto>\n");
 		exit(-1);
 	}
-
-	if(argc != 3){
+	if(argc != 5){
 		printf( "por favor especificar un numero de puerto\n");
 	}
-
 	int puerto = atoi(argv[2]);
-
 
 	//Direccion del servidor
 	struct sockaddr_in direccion_cliente;
-
 	memset(&direccion_cliente, 0, sizeof(direccion_cliente));	//ponemos en 0 la estructura direccion_servidor
 
 	//llenamos los campos
@@ -82,16 +62,40 @@ int main( int argc, char *argv[]) {
 	direccion_cliente.sin_addr.s_addr = inet_addr(argv[1]) ;	//Nos tratamos de conectar a esta direccion
 
 	//AF_INET + SOCK_STREAM = TCP
-
 	if (( sockfd = connect_retry( direccion_cliente.sin_family, SOCK_STREAM, 0, (struct sockaddr *)&direccion_cliente, sizeof(direccion_cliente))) < 0) { 
 		printf("falló conexión\n"); 
 		exit(-1);
 	} 
-
 	//En este punto ya tenemos una conexión válida
-	print_uptime(sockfd);
-
-	return 0; 
+	//Recibir mensaje de bienvenida
+	void * buf = malloc(BUFLEN);
+	if (recv(sockfd,buf,1024,0) == -1){
+		printf("Error en recv() \n");
+		exit(-1);
+	}
+	printf("%s\n",(char*)buf);
+	char buf1[BUFLEN]="GET ";
+	send(sockfd,strcat(buf1,argv[3]),BUFLEN,0);
+	//procesamos la respuesta del servidor
+  	recv(sockfd, buf, BUFLEN,0);
+  	filefd = creat(argv	[4],S_IRWXU);
+  	if (filefd < 0){
+	    printf("Error al recibir el archivo\n");
+	    return -1;
+	}else{
+	    printf("procesando respuesta del servidor\n");
+	    if ((write(filefd,buf,sizeof(buf))) < 0){
+	      	printf("Error al transferir la informacion\n");
+	      	return -1;
+	    }else{
+	      	printf("Archivo descargado correctamente\n");
+	      	return 0;
+	    }
+		
+	}
+	return 0;
 }
+
+
 
 
