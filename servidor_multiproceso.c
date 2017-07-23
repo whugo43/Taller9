@@ -24,12 +24,6 @@
 #define HOST_NAME_MAX 256 
 #endif	
 
-//Funcion de ayuda para setear la bandera close on exec
-void set_cloexec(int fd){
-	if(fcntl(fd, F_SETFD, fcntl(fd, F_GETFD) | FD_CLOEXEC) < 0){
-		printf("error al establecer la bandera FD_CLOEXEC\n");	
-	}
-}
 
 //Funcion para inicializar el servidor
 int initserver(int type, const struct sockaddr *addr, socklen_t alen, int qlen){
@@ -51,63 +45,6 @@ errout:
 	return (-1);
 }
 
-//Damos el servicio
-void serve(int sockfd) { 
-	int clfd;  
-	int filefd;
-	set_cloexec( sockfd); 
-//Ciclo para enviar y recibir mensajes
-	for (;;) { 
-		if (( clfd = accept( sockfd, NULL, NULL)) < 0) { 		//Aceptamos una conexion
-			syslog( LOG_ERR, "ruptimed: accept error: %s", strerror( errno)); 	//si hay error la ponemos en la bitacora			
-			exit( 1); 
-		} 
-		set_cloexec(clfd);
-
-		//AQUI SEND
-		char enviar[BUFLEN]; //Para enviar mensaje
-		printf("\n------SESION INICIADA------\n");
-		printf("CLIENTE CONECTADO\n");
-		strcpy(enviar,"SERVIDOR CONECTADO...");
-		send(clfd, enviar, BUFLEN,0);
-
-	    char *ruta = malloc(BUFLEN*sizeof(char *));
-	    char *file = malloc(BUFFERING*sizeof(char *));
-		memset(file,0,BUFFERING);
-		int n=0;
-	  	while((n=recv(clfd, ruta, BUFLEN, 0))==0);
-	  	printf("%s\n",ruta);
-            
-	    filefd = open(ruta+4,O_RDONLY);
-	    if (filefd < 0){
-			printf("Error en archivo\n");
-			char * ermjs = "Error en archivo\n";
-			send(clfd, ermjs, strlen(ermjs) ,0);
-			return ;
-	    }else{
-	    	printf("Archivo encontrado y abierto correctamente\n");
-	    	int filesize ;
-	    	while((filesize= read(filefd, file, BUFFERING))>0){
-		        if ((send(clfd, file, filesize,0)) <= 0){
-			        printf("Error con el archivo\n");
-			        char * ermjs = "Error en el envio del archivo\n";
-			        send(clfd, ermjs, strlen(ermjs) ,0);
-			        return;
-	        	}else{
-	        		memset(file,0,BUFFERING);
-	        		printf("enviando......\n");
-	        	}
-	        }
-	        printf("Archivo enviado correctamente\n");
-	    }
-	    close(filefd);
-	    free(file);
-	    close(clfd); 
-	    		//cerramos la conexion con el cliente.	   
-
-	 }
-	}	
-    
 
 
 //Main
@@ -151,9 +88,63 @@ int main( int argc, char *argv[]) {
 	}		
 
 	while(1){
-		serve(sockfd);
-		//TODO servimos
-	}
+		int clfd;  
+		int filefd;
+		//Ciclo para enviar y recibir mensajes
+			if (( clfd = accept( sockfd, NULL, NULL)) < 0) { 		//Aceptamos una conexion
+				syslog( LOG_ERR, "ruptimed: accept error: %s", strerror( errno)); 	//si hay error la ponemos en la bitacora			
+				exit( 1); 
+			} 
+			
+			int pidf=fork();
+			if (pidf==0) { // Este es el proceso hijo
+			//AQUI SEND
+			char enviar[BUFLEN]; //Para enviar mensaje
+			printf("\n------SESION INICIADA------\n");
+			printf("CLIENTE CONECTADO\n");
+			strcpy(enviar,"SERVIDOR CONECTADO...");
+			send(clfd, enviar, BUFLEN,0);
+
+		    char *ruta = malloc(BUFLEN*sizeof(char *));
+		    char *file = malloc(BUFFERING*sizeof(char *));
+			memset(file,0,BUFFERING);
+			recv(clfd, ruta, BUFLEN, 0);
+		  	printf("%s\n",ruta);
+		    filefd = open(ruta+4,O_RDONLY);
+		    if (filefd < 0){
+				printf("Error en archivo\n");
+				char * ermjs = "Error en archivo\n";
+				send(clfd, ermjs, strlen(ermjs) ,0);
+				close(clfd);
+				return -1;
+		    }else{
+		    	printf("Archivo encontrado y abierto correctamente\n");
+		    	int filesize ;
+		    	while((filesize= read(filefd, file, BUFFERING))>0){
+			        if ((send(clfd, file, filesize,0)) <= 0){
+				        printf("Error con el archivo\n");
+				        char * ermjs = "Error en el envio del archivo\n";
+				        send(clfd, ermjs, strlen(ermjs) ,0);
+				        close(clfd);
+				        return -1;
+		        	}else{
+		        		memset(file,0,BUFFERING);
+		        		printf("enviando......\n");
+		        	}
+		        }
+		        printf("Archivo enviado correctamente\n");
+		    }
+		    close(filefd);
+		    free(file);
+		    close(clfd); 
+		    exit(0);
+		    		//cerramos la conexion con el cliente.	      
+		    }else{
+		    close(clfd);  // El proceso padre no lo necesita
+		   	continue;
+		    }
+		 }
+		
 	
 	exit( 1); 
 }
