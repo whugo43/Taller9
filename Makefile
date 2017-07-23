@@ -7,4 +7,4 @@ cliente: cliente_taller.c
 	gcc -Wall $^ -o $@
 
 clean:
-	rm -rf cliente servidor 
+	rm -rf cliente servidor
