@@ -1,10 +1,11 @@
 all: servidor cliente
 
-servidor: servidor_taller.c 
+servidor: servidor_multiproceso.c 
 	gcc -Wall -g $^ -o $@
 
-cliente: cliente_taller.c 
+cliente: cliente_multiproceso.c 
 	gcc -Wall $^ -o $@
 
 clean:
-	rm -rf cliente servidor
+	rm -rf cliente servidor archivo[0-9] archivo[0-9][0-9]
+ 
