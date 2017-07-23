@@ -18,6 +18,7 @@
 
 #define BUFLEN 1024
 #define MAXSLEEP 64
+#define BUFFERING 100000000
 
 int connect_retry( int domain, int type, int protocol, 	const struct sockaddr *addr, socklen_t alen){
 	
@@ -39,7 +40,6 @@ int connect_retry( int domain, int type, int protocol, 	const struct sockaddr *a
 }
 
 int main( int argc, char *argv[]) { 
-
 	int sockfd;
 	int filefd; 
 
@@ -68,34 +68,39 @@ int main( int argc, char *argv[]) {
 	} 
 	//En este punto ya tenemos una conexión válida
 	//Recibir mensaje de bienvenida
-	void * buf = malloc(BUFLEN);
+	void * buf = malloc(BUFLEN*sizeof(char *));
 	if (recv(sockfd,buf,1024,0) == -1){
 		printf("Error en recv() \n");
 		exit(-1);
 	}
-	printf("%s\n",(char*)buf);
+	printf(" %s \n",(char*)buf);
 	char buf1[BUFLEN]="GET ";
 	send(sockfd,strcat(buf1,argv[3]),BUFLEN,0);
 	//procesamos la respuesta del servidor
-  	recv(sockfd, buf, BUFLEN,0);
-  	filefd = creat(argv	[4],S_IRWXU);
-  	if (filefd < 0){
+	int n=0;  	
+	char *file = malloc(BUFFERING*sizeof(char *));
+	memset(file,0,BUFFERING);
+	filefd = open(argv[4],O_CREAT|O_TRUNC|O_RDWR,S_IRWXU);
+	if (filefd < 0){
 	    printf("Error al recibir el archivo\n");
 	    return -1;
-	}else{
-	    printf("procesando respuesta del servidor\n");
-	    if ((write(filefd,buf,sizeof(buf))) < 0){
+	}
+	printf("procesando respuesta del servidor\n");
+	while((n=recv(sockfd, file, BUFFERING,0))>0){
+	    if ((write(filefd,file,n)) < 0){
 	      	printf("Error al transferir la informacion\n");
 	      	return -1;
 	    }else{
-	      	printf("Archivo descargado correctamente\n");
-	      	return 0;
-	    }
-		
-	}
+	      	printf("DOWNLOAD.....\n");
+	      	memset(file,0,BUFFERING);
+	    	}
+		}
+		printf("Archivo descargado correctamente\n");
+		memset(file,0,BUFFERING);
+		free(file);
+		close(filefd);
 	return 0;
 }
-
 
 
 

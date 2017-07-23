@@ -17,7 +17,8 @@
 #include <sys/resource.h>
 
 #define BUFLEN 1024 
-#define QLEN 10 
+#define BUFFERING 100000000
+#define QLEN 50 
 
 #ifndef HOST_NAME_MAX 
 #define HOST_NAME_MAX 256 
@@ -39,7 +40,7 @@ int initserver(int type, const struct sockaddr *addr, socklen_t alen, int qlen){
 	if(bind(fd, addr, alen) < 0)
 		goto errout;
 	if(type == SOCK_STREAM || type == SOCK_SEQPACKET){
-		if(listen(fd, qlen) < 0)
+		if(listen(fd, QLEN) < 0)
 			goto errout;
 	}
 	return fd;
@@ -61,20 +62,22 @@ void serve(int sockfd) {
 			syslog( LOG_ERR, "ruptimed: accept error: %s", strerror( errno)); 	//si hay error la ponemos en la bitacora			
 			exit( 1); 
 		} 
-		set_cloexec(clfd); 
+		set_cloexec(clfd);
 
 		//AQUI SEND
 		char enviar[BUFLEN]; //Para enviar mensaje
-		printf("------SESION INICIADA------\n");
+		printf("\n------SESION INICIADA------\n");
 		printf("CLIENTE CONECTADO\n");
 		strcpy(enviar,"SERVIDOR CONECTADO...");
 		send(clfd, enviar, BUFLEN,0);
 
-	    char *ruta = malloc(BUFLEN);
-	    void *file = malloc(BUFLEN);
-
-	  	recv(clfd, ruta, BUFLEN, 0);
-	  
+	    char *ruta = malloc(BUFLEN*sizeof(char *));
+	    char *file = malloc(BUFFERING*sizeof(char *));
+		memset(file,0,BUFFERING);
+		int n=0;
+	  	while((n=recv(clfd, ruta, BUFLEN, 0))==0);
+	  	printf("%s\n",ruta);
+            
 	    filefd = open(ruta+4,O_RDONLY);
 	    if (filefd < 0){
 			printf("Error en archivo\n");
@@ -83,26 +86,29 @@ void serve(int sockfd) {
 			return ;
 	    }else{
 	    	printf("Archivo encontrado y abierto correctamente\n");
-	    	int filesize = read(filefd, file, BUFLEN);
-	      	if (filesize <= 0){
-		        printf("lectura del archivo erronea\n");
-		        char * ermjs = "lectura del archivo erronea\n";
-		        send(clfd, ermjs, strlen(ermjs) ,0);
-		        return ;
-	     	}else{
-		        printf("Archivo leido correctamente\n");
-		        if ((write(clfd, file, filesize)) <= 0){
+	    	int filesize ;
+	    	while((filesize= read(filefd, file, BUFFERING))>0){
+		        if ((send(clfd, file, filesize,0)) <= 0){
 			        printf("Error con el archivo\n");
 			        char * ermjs = "Error en el envio del archivo\n";
 			        send(clfd, ermjs, strlen(ermjs) ,0);
 			        return;
-	        	}else
-	        		printf("Archivo enviado correctamente\n");
-	      	}
-	    }	
-	  }
-	close(clfd); 			//cerramos la conexion con el cliente.
-}
+	        	}else{
+	        		memset(file,0,BUFFERING);
+	        		printf("enviando......\n");
+	        	}
+	        }
+	        printf("Archivo enviado correctamente\n");
+	    }
+	    close(filefd);
+	    free(file);
+	    close(clfd); 
+	    		//cerramos la conexion con el cliente.	   
+
+	 }
+	}	
+    
+
 
 //Main
 
