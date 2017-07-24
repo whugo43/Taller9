@@ -23,11 +23,13 @@
 #ifndef HOST_NAME_MAX 
 #define HOST_NAME_MAX 256 
 #endif	
-
+int clfd;  
+int filefd;
+int sockfd;
+int fd;
 
 //Funcion para inicializar el servidor
 int initserver(int type, const struct sockaddr *addr, socklen_t alen, int qlen){
-	int fd;
 	int err = 0;
 	if((fd = socket(addr->sa_family, type, 0)) < 0)
 		return -1;
@@ -45,12 +47,19 @@ errout:
 	return (-1);
 }
 
-
+void handlersig(int senal) {
+	if (senal == SIGTSTP) {
+		close(sockfd);
+		close(clfd);
+		printf("\t;puertos cerrados\n");
+		exit(0);
+	}
+}
 
 //Main
 
 int main( int argc, char *argv[]) { 
-	int sockfd, n;
+	int  n;
 	char *host; 
 
 	if(argc == 1){
@@ -86,10 +95,10 @@ int main( int argc, char *argv[]) {
 	if( (sockfd = initserver(SOCK_STREAM, (struct sockaddr *)&direccion_servidor, sizeof(direccion_servidor), 1000)) < 0){	//Hasta 1000 solicitudes en cola 
 		printf("Error al inicializar el servidor\n");	
 	}		
-
+	//atrapando senal en padre
+	signal(SIGTSTP,handlersig);
 	while(1){
-		int clfd;  
-		int filefd;
+		
 		//Ciclo para enviar y recibir mensajes
 		if (( clfd = accept( sockfd, NULL, NULL)) < 0) { 		//Aceptamos una conexion
 			syslog( LOG_ERR, "ruptimed: accept error: %s", strerror( errno)); 	//si hay error la ponemos en la bitacora			
@@ -154,6 +163,8 @@ int main( int argc, char *argv[]) {
 
 			}
 		}else{
+			//atrapando senal en padre
+	signal(SIGTSTP,handlersig);
 		    close(clfd);  // El proceso padre no lo necesita
 		   	continue;
 		}
@@ -162,5 +173,4 @@ int main( int argc, char *argv[]) {
 	
 	exit( 1); 
 }
-
 
