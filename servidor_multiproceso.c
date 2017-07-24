@@ -91,15 +91,16 @@ int main( int argc, char *argv[]) {
 		int clfd;  
 		int filefd;
 		//Ciclo para enviar y recibir mensajes
-			if (( clfd = accept( sockfd, NULL, NULL)) < 0) { 		//Aceptamos una conexion
-				syslog( LOG_ERR, "ruptimed: accept error: %s", strerror( errno)); 	//si hay error la ponemos en la bitacora			
-				exit( 1); 
-			} 
-			
-			int pidf=fork();
-			if (pidf==0) { // Este es el proceso hijo
-			close(sockfd);
-	        sigset_t noprocsignal;
+		if (( clfd = accept( sockfd, NULL, NULL)) < 0) { 		//Aceptamos una conexion
+			syslog( LOG_ERR, "ruptimed: accept error: %s", strerror( errno)); 	//si hay error la ponemos en la bitacora			
+			exit( 1); 
+		} 
+		
+		int pidf=fork();
+		if (pidf==0){ // Este es el proceso hijo
+			//close(sockfd);
+			//bloqueando senal para hijos
+		    sigset_t noprocsignal;
 		    sigemptyset(&noprocsignal);
 		    sigaddset(&noprocsignal,SIGTSTP);
 		    sigprocmask(SIG_BLOCK, &noprocsignal, 0);  
@@ -115,42 +116,49 @@ int main( int argc, char *argv[]) {
 		    char *file = malloc(BUFFERING*sizeof(char *));
 			memset(file,0,BUFFERING);
 			recv(clfd, ruta, BUFLEN, 0);
-		  	printf("%s\n",ruta);
-		    filefd = open(ruta+4,O_RDONLY);
-		    if (filefd < 0){
-				printf("Error en archivo\n");
-				char * ermjs = "Error en archivo\n";
-				send(clfd, ermjs, strlen(ermjs) ,0);
-				close(clfd);
-				return -1;
-		    }else{
-		    	printf("Archivo encontrado y abierto correctamente\n");
-		    	int filesize ;
-		    	while((filesize= read(filefd, file, BUFFERING))>0){
-			        if ((send(clfd, file, filesize,0)) <= 0){
-				        printf("Error con el archivo\n");
-				        char * ermjs = "Error en el envio del archivo\n";
-				        send(clfd, ermjs, strlen(ermjs) ,0);
-				        close(clfd);
-				        return -1;
-		        	}else{
-		        		memset(file,0,BUFFERING);
-		        		printf("enviando......\n");
-		        	}
-		        }
-		        printf("Archivo enviado correctamente\n");
-		    }
-		    close(filefd);
-		    free(file);
-		    close(clfd); 
-		    exit(0);
-		    		//cerramos la conexion con el cliente.	      
-		    }else{
+		  	//tratamiento tipo de solicitud
+		  	if (strstr(ruta, "GET") != NULL) {
+	  			printf("Solicitud recibida: GET %s \n",ruta);
+	  			printf("Argumento solicitud: %s \n",ruta+4);
+			    filefd = open(ruta+4,O_RDONLY);
+			    if (filefd < 0){
+					printf("Error en archivo\n");
+					char * ermjs = "Error en archivo\n";
+					send(clfd, ermjs, strlen(ermjs) ,0);
+					close(clfd);
+					return -1;
+			    }else{
+			    	printf("Archivo encontrado y abierto correctamente\n");
+			    	int filesize ;
+			    	while((filesize= read(filefd, file, BUFFERING))>0){
+				        if ((send(clfd, file, filesize,0)) <= 0){
+					        printf("Error con el archivo\n");
+					        char * ermjs = "Error en el envio del archivo\n";
+					        send(clfd, ermjs, strlen(ermjs) ,0);
+					        close(clfd);
+					       exit(0);
+			        	}else{
+			        		memset(file,0,BUFFERING);
+			        		printf("enviando......\n");
+			        	}
+			        }
+			        printf("Archivo enviado correctamente\n");
+			    }
+			    close(filefd);
+			    free(file);
+			    close(clfd); 
+			    exit(0);
+			}else{
+				printf("solicitud no definida\n");
+				exit(0);
+
+			}
+		}else{
 		    close(clfd);  // El proceso padre no lo necesita
 		   	continue;
-		    }
-		 }
-		
+		}
+	}
+	
 	
 	exit( 1); 
 }
