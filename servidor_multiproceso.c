@@ -98,6 +98,12 @@ int main( int argc, char *argv[]) {
 			
 			int pidf=fork();
 			if (pidf==0) { // Este es el proceso hijo
+			close(sockfd);
+	        sigset_t noprocsignal;
+		    sigemptyset(&noprocsignal);
+		    sigaddset(&noprocsignal,SIGTSTP);
+		    sigprocmask(SIG_BLOCK, &noprocsignal, 0);  
+		      
 			//AQUI SEND
 			char enviar[BUFLEN]; //Para enviar mensaje
 			printf("\n------SESION INICIADA------\n");
